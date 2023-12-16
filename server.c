@@ -25,11 +25,11 @@ void playGame();
 void waitUser(score_t *score);
 cards_t makeRandomCard(pid_t pid);
 void sendRoundStart(score_t *score);
-void waitAnswer(answer_result_t* answers);
+void waitAnswer(score_t *score, answer_result_t* answers);
 pid_t judgeWinner(answer_result_t* answers);
 void sendRoundEnd(score_t* score ,pid_t winner_pid, answer_result_t* answers);
-// void updateScore();
-// void sendGameOver();
+void sendGameOver(score_t* score);
+int countElements(result_t array[], result_t target);
 
 key_t mykey = 0;
 int msqid = 0;
@@ -51,6 +51,11 @@ void playGame() {
     score_t score;
     memset(&score, 0x00, sizeof(score_t));
 
+    for (int i = 0; i < 5; i++) {
+        score.user1_result[i] = NONE;
+        score.user2_result[i] = NONE;
+    }
+
     waitUser(&score); // uid 반환
     score.round = 1;
     printf("첫 번째 유저 %d\n", score.user1_pid);
@@ -61,14 +66,18 @@ void playGame() {
     while (score.round <= 5)  {
         answer_result_t answers[2];
         pid_t winner_pid;
+        int win_count = 0;
+        int lose_count = 0;
 
         sendRoundStart(&score);
-        waitAnswer(answers); // User Answer 구조체 반환
+        waitAnswer(&score, answers); // User Answer 구조체 반환
         winner_pid = judgeWinner(answers); // 승리자 반환
-        sendRoundEnd(&score, winner_pid, answers); // 
-        // updateScore();
+        sendRoundEnd(&score, winner_pid, answers); 
+        if (score.round == -1)
+            break;
     }
 
+    sendGameOver(&score);
 
 }
 
@@ -110,7 +119,7 @@ void sendRoundStart(score_t *score) {
     msgsnd(msqid, &s_msg_round_start, SERVER_MSG_SIZE_ROUND_START, 0);
 }
 
- void waitAnswer(answer_result_t* answers) //TODO2: 유저의 응답을 받아서 승리를 판별하는 로직
+ void waitAnswer(score_t *score, answer_result_t* answers) //TODO2: 유저의 응답을 받아서 승리를 판별하는 로직
 {
     c_msg_answer_t c_msg_answer_1;
     c_msg_answer_t c_msg_answer_2;
@@ -146,8 +155,14 @@ void sendRoundStart(score_t *score) {
     for (int  i = 0; i < 1; i ++)
         user2_result.card.operator_card[i] = c_msg_answer_2.operator_card[i];
 
-    answers[0] = user1_result; 
-    answers[1] = user2_result;
+    if (score->user1_pid == user1_result.card.pid) {
+        answers[0] = user1_result; 
+        answers[1] = user2_result;
+    } else {
+        answers[0] = user2_result; 
+        answers[1] = user1_result;
+    }
+
     return;
 }
 
@@ -158,17 +173,14 @@ pid_t judgeWinner(answer_result_t* answers) {
 
     if (answers[0].solution == answers[1].solution)
     { 
-        
         return -1;
     }
     else if (answers[0].solution > answers[1].solution)
     {    
-        
         return answers[0].card.pid; 
     }
     else 
     {
-        
         return answers[1].card.pid;
     }
     
@@ -180,10 +192,9 @@ void sendRoundEnd(score_t* score ,pid_t winner_pid, answer_result_t* answers) {
 
     memset(&s_msg_round_end, 0x00, sizeof(s_msg_round_end_t));
 
-    s_msg_round_end.mtype = SERVER_MSG_SIZE_ROUND_END;
+    s_msg_round_end.mtype = SERVER_MSG_TYPE_ROUND_END;
     s_msg_round_end.round = score->round;
-    score->round++;
-    s_msg_round_end.next_round = score->round;
+
     
 
     s_msg_round_end.user1_answer_result = answers[0];
@@ -193,18 +204,36 @@ void sendRoundEnd(score_t* score ,pid_t winner_pid, answer_result_t* answers) {
         printf("무승부 입니다.\n\n");
         s_msg_round_end.user1_result = DRAW;
         s_msg_round_end.user2_result = DRAW;
+
+        score->user1_result[score->round - 1] = DRAW;
+        score->user2_result[score->round - 1] = DRAW;
     } else if ( winner_pid == answers[0].card.pid) {
         printf("%d 가 승리하였습니다.\n\n", answers[0].card.pid);
         s_msg_round_end.user1_result = WIN;
         s_msg_round_end.user2_result = LOSE;
+
+        score->user1_result[score->round - 1] = WIN;
+        score->user2_result[score->round - 1] = LOSE;
     } else {
         printf("%d 가 승리하였습니다.\n\n", answers[1].card.pid);
+
+        score->user1_result[score->round - 1] = LOSE;
+        score->user2_result[score->round - 1] = WIN;
+
         s_msg_round_end.user1_result = LOSE;
         s_msg_round_end.user2_result = WIN;
     }
 
-    msgsnd(msqid, &s_msg_round_end, SERVER_MSG_TYPE_ROUND_END, 0);
-    msgsnd(msqid, &s_msg_round_end, SERVER_MSG_TYPE_ROUND_END, 0);
+    score->round++;
+    s_msg_round_end.next_round = score->round;
+
+    if (countElements(score->user1_result, WIN) >= 3 || countElements(score->user1_result, LOSE) >= 3) {
+        score->round = -1;
+        s_msg_round_end.next_round = -1;
+    }
+
+    msgsnd(msqid, &s_msg_round_end, SERVER_MSG_SIZE_ROUND_END, 0);
+    msgsnd(msqid, &s_msg_round_end, SERVER_MSG_SIZE_ROUND_END, 0);
 }
 
 cards_t makeRandomCard(pid_t pid) {
@@ -251,3 +280,26 @@ int calculate(c_msg_answer_t answer)
     }
 }
 
+void sendGameOver(score_t* score) {
+    printf("\n 게임이 종료되었습니다.");
+    s_msg_game_over_t s_msg_game_over;
+
+    memset(&s_msg_game_over, 0x00, sizeof(s_msg_game_over_t));
+
+    s_msg_game_over.mtype = SERVER_MSG_TYPE_GAME_OVER;
+    s_msg_game_over.score = *score;
+
+    msgsnd(msqid, &s_msg_game_over, SERVER_MSG_SIZE_GAME_OVER, 0);
+    msgsnd(msqid, &s_msg_game_over, SERVER_MSG_SIZE_GAME_OVER, 0);
+}
+
+int countElements(result_t array[5], result_t target) {
+    int count = 0;
+
+    for (int i = 0; i < 5; ++i) {
+        if (array[i] == target) {
+            count++;
+        }
+    }
+    return count;
+}

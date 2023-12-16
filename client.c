@@ -15,11 +15,12 @@ void sendLogin();
 void playGame();
 void waitRoundStart();
 void sendAnswer();
-void waitRoundEnd();
+void waitRoundEnd(int* next_round);
 void waitGameOver();
 
 char convert(operator_t op);
 operator_t convertToOperator(char op);
+char* convertToString(result_t result);
 
 key_t g_mykey = 0;
 int g_msqid = 0;
@@ -36,13 +37,19 @@ int main(int argc, char const *argv[])
 
 void playGame()
 {
+    int next_round = 1;
 
     while (1)
     {
         waitRoundStart();
         sendAnswer();
-        waitRoundEnd();
+        waitRoundEnd(&next_round);
+
+        if (next_round == -1)
+            break;
     }
+
+    waitGameOver();
     return;
 }
 
@@ -80,6 +87,7 @@ void sendAnswer()
     int y;
     char op;
     scanf("%d %c %d", &x, &op, &y);
+    
 
     c_msg_answer_t c_msg_answer;
     memset(&c_msg_answer, 0x00, sizeof(c_msg_answer_t));
@@ -89,18 +97,57 @@ void sendAnswer()
     c_msg_answer.num_card[0] = x;
     c_msg_answer.num_card[1] = y;
     c_msg_answer.operator_card[0] = convertToOperator(op); 
+    
     printf("%d, %d , %c 입력했습니다.", c_msg_answer.num_card[0], c_msg_answer.num_card[1], c_msg_answer.operator_card[0]);
+    
+    fflush(stdout);
     msgsnd(g_msqid, &c_msg_answer, CLIENT_MSG_SIZE_ANSWER, 0);
+    
+    return;
 }
 
-void waitRoundEnd()
+void waitRoundEnd(int* next_round)
 {
+    s_msg_round_end_t s_msg_round_end;
+    memset(&s_msg_round_end, 0x00, sizeof(s_msg_round_end_t));
+    msgrcv(g_msqid, &s_msg_round_end, SERVER_MSG_SIZE_ROUND_END, SERVER_MSG_TYPE_ROUND_END, 0);
+    
+
+    result_t result = s_msg_round_end.user1_answer_result.card.pid == getpid() ? s_msg_round_end.user1_result : s_msg_round_end.user2_result;
+    switch (result) {
+        case WIN: 
+        printf("%d번째 라운드 승리하셨습니다.\n",s_msg_round_end.round);
+        break;
+        case LOSE: 
+        printf("%d번째 라운드 패배하셨습니다.\n",s_msg_round_end.round);
+        break;
+        case DRAW: 
+        printf("%d번째 라운드 무승부입니다.\n",s_msg_round_end.round);
+        break;
+        default: printf("오류  발생");
+    }
+    
+    *next_round = s_msg_round_end.next_round;
     return;
 }
 
 void waitGameOver()
 {
-    return;
+    s_msg_game_over_t s_msg_game_over;
+    memset(&s_msg_game_over, 0x00, sizeof(s_msg_game_over_t));
+    msgrcv(g_msqid, &s_msg_game_over, SERVER_MSG_SIZE_GAME_OVER, SERVER_MSG_TYPE_GAME_OVER, 0);
+
+
+    result_t results[5];
+
+    for (int i = 0; i < 5; i ++) {
+        results[i] = s_msg_game_over.score.user1_pid == getpid() ? s_msg_game_over.score.user1_result[i] : s_msg_game_over.score.user2_result[i];
+        printf("%d 라운드 결과: %s\n",i + 1, convertToString(results[i]));
+    }
+    
+
+    
+
 }
 
 char convert(operator_t op)
@@ -121,12 +168,26 @@ char convert(operator_t op)
     }
 }
 
+char* convertToString(result_t result)
+{
+    switch (result)
+    {
+    case WIN:
+        return "승리";
+    case LOSE:
+        return "패배";
+    case DRAW:
+        return "무승부";
+    default:
+        return "-";
+    }
+}
+
 operator_t convertToOperator(char op)
 {
     switch (op)
     {
     case '+':
-        printf("asdfasdf");
         return PLUS;
     case '-':
         return MINUS;

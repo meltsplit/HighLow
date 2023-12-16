@@ -34,8 +34,7 @@ typedef struct s_msg_round_end
 typedef struct s_msg_game_over
 {
     long mtype;
-    pid_t target_user;
-    game_over_t game_over;
+    score_t score;
 } s_msg_game_over_t;
 
 #endif //!__SERVERMSG_H__

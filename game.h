@@ -6,7 +6,8 @@
 typedef enum result {
     WIN = 0,
     LOSE,
-    DRAW
+    DRAW,
+    NONE
 } result_t;
 
 typedef enum operator {
@@ -37,12 +38,6 @@ typedef struct answer_result
     int solution;
 } answer_result_t;
 
-
-typedef struct game_over
-{
-    result_t game_result;
-
-} game_over_t;
 
 typedef struct score
 {
