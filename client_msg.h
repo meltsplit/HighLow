@@ -19,7 +19,9 @@ typedef struct c_msg_login
 typedef struct c_msg_answer
 {
     long mtype;
-    asnwer_t answer;
+    pid_t pid;
+    int num_card[2];
+    operator_t operator_card[1];
 } c_msg_answer_t;
 
 #endif //!__SERVERMSG_H__

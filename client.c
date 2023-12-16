@@ -19,6 +19,7 @@ void waitRoundEnd();
 void waitGameOver();
 
 char convert(operator_t op);
+operator_t convertToOperator(char op);
 
 key_t g_mykey = 0;
 int g_msqid = 0;
@@ -66,10 +67,10 @@ void waitRoundStart()
     printf("\n\n[ROUND %d]\n게임을 시작합니다.\n", round);
     printf("CARD PID: %d\n", card.pid);
 
-    for (int i = 0; i < 4; i++)
+    for (int i = 0; i < 2; i++)
         printf("CARD %d번째 숫자 카드: %d\n", i+1, card.num_card[i]);
 
-    for (int i = 0; i < 3; i++)
+    for (int i = 0; i < 1; i++)
         printf("CARD %d번째 연산자 카드: %c\n", i+1, convert(card.operator_card[i]));
 }
 
@@ -79,6 +80,17 @@ void sendAnswer()
     int y;
     char op;
     scanf("%d %c %d", &x, &op, &y);
+
+    c_msg_answer_t c_msg_answer;
+    memset(&c_msg_answer, 0x00, sizeof(c_msg_answer_t));
+    c_msg_answer.mtype = CLIENT_MSG_TYPE_ANSWER;
+    c_msg_answer.pid = getpid();
+
+    c_msg_answer.num_card[0] = x;
+    c_msg_answer.num_card[1] = y;
+    c_msg_answer.operator_card[0] = convertToOperator(op); 
+    printf("%d, %d , %c 입력했습니다.", c_msg_answer.num_card[0], c_msg_answer.num_card[1], c_msg_answer.operator_card[0]);
+    msgsnd(g_msqid, &c_msg_answer, CLIENT_MSG_SIZE_ANSWER, 0);
 }
 
 void waitRoundEnd()
@@ -108,6 +120,27 @@ char convert(operator_t op)
         return '\0';
     }
 }
+
+operator_t convertToOperator(char op)
+{
+    switch (op)
+    {
+    case '+':
+        printf("asdfasdf");
+        return PLUS;
+    case '-':
+        return MINUS;
+    case '*':
+        return MULTIPLY;
+    case '/':
+        return DIVIDE;
+    default:
+        printf("WTFFF");
+        return '\0';
+    }
+}
+
+
 
 // while (1)
 // {

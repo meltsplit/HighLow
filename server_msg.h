@@ -23,8 +23,12 @@ typedef struct s_msg_round_start
 typedef struct s_msg_round_end
 {
     long mtype;
-    pid_t target_user;
-    round_end_t round_end;
+    int round;
+    answer_result_t user1_answer_result;
+    answer_result_t user2_answer_result;
+    result_t user1_result;
+    result_t user2_result;
+    int next_round;       
 } s_msg_round_end_t;
 
 typedef struct s_msg_game_over

@@ -23,39 +23,20 @@ typedef struct __Calc
     char op;
 } Calc;
 
-
-
 typedef struct cards
 {
     pid_t pid;
-
-    int num_card[4];
-    operator_t operator_card[3];
+    int num_card[2];
+    operator_t operator_card[1];
     
 } cards_t;
-
-typedef struct answer
-{
-    pid_t pid;
-    int round;
-    char answer[8]; 
-} asnwer_t;
 
 typedef struct answer_result
 {
     cards_t card; 
-    char answer[8];
     int solution;
 } answer_result_t;
 
-typedef struct round_end
-{
-    int round;
-    answer_result_t your_result;
-    answer_result_t component_result;
-    result_t round_result;
-    int next_round;
-} round_end_t;
 
 typedef struct game_over
 {
